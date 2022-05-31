@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentSkipListMap;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import com.embark.crud.exception.AccountAlreadyExistsException;
 import com.embark.crud.exception.AccountNotFoundException;
 import com.embark.crud.model.UserAccount;
@@ -16,6 +17,7 @@ import org.springframework.stereotype.Service;
 public class UserAccountRepositoryImpl implements CrudRepository<UserAccount> {
 
     private final Map<String, UserAccount> cache;
+    private final ReentrantReadWriteLock reentrantReadWriteLock = new ReentrantReadWriteLock();
 
     public UserAccountRepositoryImpl() {
         this.cache = initCache();
@@ -24,57 +26,82 @@ public class UserAccountRepositoryImpl implements CrudRepository<UserAccount> {
     @Override
     public UserAccount createAccount(UserAccount userAccount) {
         String id = userAccount.getId();
-        if (cache.containsKey(id)) {
-            String errorMessage = String.format("Account with id %s already exists", id);
-            throw new AccountAlreadyExistsException(errorMessage);
+        reentrantReadWriteLock.writeLock().lock();
+        try {
+            if (cache.containsKey(id)) {
+                String errorMessage = String.format("Account with id %s already exists", id);
+                throw new AccountAlreadyExistsException(errorMessage);
+            }
+            log.info("Creating user account with id {}", id);
+            cache.put(id, userAccount);
+            return userAccount;
+        } finally {
+            reentrantReadWriteLock.writeLock().unlock();
         }
-        log.info("Creating user account with id {}", id);
-        cache.put(id, userAccount);
-        return userAccount;
     }
 
     @Override
     public UserAccount readAccount(String id) {
-        if (cache.containsKey(id)) {
+        reentrantReadWriteLock.readLock().lock();
+        try {
+            if (!cache.containsKey(id)) {
+                String errorMessage = String.format("Account with id %s not found", id);
+                throw new AccountNotFoundException(errorMessage);
+            }
             log.info("Getting user account with id {}", id);
             return cache.get(id);
+        } finally {
+            reentrantReadWriteLock.readLock().unlock();
         }
-        String errorMessage = String.format("Account with id %s not found", id);
-        throw new AccountNotFoundException(errorMessage);
     }
 
     @Override
     public UserAccount updateAccount(UserAccount userAccount) {
         String id = userAccount.getId();
-        if (cache.containsKey(id)) {
+        reentrantReadWriteLock.writeLock().lock();
+        try {
+            if (!cache.containsKey(id)) {
+                String errorMessage = String.format("Account with id %s not found", id);
+                throw new AccountNotFoundException(errorMessage);
+            }
             log.info("Updating user account with id {}", id);
             return cache.replace(id, userAccount);
+        } finally {
+            reentrantReadWriteLock.writeLock().unlock();
         }
-        String errorMessage = String.format("Account with id %s not found", id);
-        throw new AccountNotFoundException(errorMessage);
     }
 
     @Override
     public UserAccount deleteAccount(String id) {
-        if (cache.containsKey(id)) {
+        reentrantReadWriteLock.writeLock().lock();
+        try {
+            if (!cache.containsKey(id)) {
+                String errorMessage = String.format("Account with id %s not found", id);
+                throw new AccountNotFoundException(errorMessage);
+            }
             log.info("Deleting user account with id {}", id);
             return cache.remove(id);
+        } finally {
+            reentrantReadWriteLock.writeLock().unlock();
         }
-        String errorMessage = String.format("Account with id %s not found", id);
-        throw new AccountNotFoundException(errorMessage);
     }
 
     @Override
     public List<UserAccount> readAccountList(int page, int size) {
         log.info("Getting user account list for page {} with size {}", page, size);
-        List<UserAccount> allValues = new ArrayList<>(cache.values());
-        if (allValues.size() < (page - 1) * size) {
-            return readAccountList(page - 1, size);
+        reentrantReadWriteLock.readLock().lock();
+        try {
+            List<UserAccount> allValues = new ArrayList<>(cache.values());
+            while (allValues.size() < (page - 1) * size) {
+                --page;
+            }
+            if (allValues.size() < page * size) {
+                return allValues.subList((page - 1) * size, allValues.size());
+            }
+            return allValues.subList((page - 1) * size, page * size);
+        } finally {
+            reentrantReadWriteLock.readLock().unlock();
         }
-        if (allValues.size() < page * size) {
-            return allValues.subList((page - 1) * size, allValues.size());
-        }
-        return allValues.subList((page - 1) * size, page * size);
     }
 
     private Map<String, UserAccount> initCache() {

@@ -87,7 +87,7 @@ public class UserAccountController {
         }
     }
 
-    @GetMapping("/list")
+    @GetMapping
     @ApiOperation(value = "Get user account list",
                   notes = "Returns user account list with pagination")
     public ResponseEntity<List<UserAccount>> readAccountList(@RequestParam final int page, @RequestParam final int size) {

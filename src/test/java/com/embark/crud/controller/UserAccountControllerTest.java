@@ -8,13 +8,11 @@ import com.embark.crud.service.CrudService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.hamcrest.Matchers.hasSize;
@@ -26,7 +24,6 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(SpringExtension.class)
 @WebMvcTest(UserAccountController.class)
 class UserAccountControllerTest {
 
@@ -187,14 +184,14 @@ class UserAccountControllerTest {
 
     @Test
     void readAccountList_whenPageCountIsLessThanOne_returnsBadRequestStatus() throws Exception {
-        mvc.perform(get("/users/list?page=0&size=1")
+        mvc.perform(get("/users?page=0&size=1")
                             .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
     void readAccountList_whenPageSizeIsLessThanZero_returnsBadRequestStatus() throws Exception {
-        mvc.perform(get("/users/list?page=1&size=-3")
+        mvc.perform(get("/users?page=1&size=-3")
                             .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isBadRequest());
     }
@@ -205,7 +202,7 @@ class UserAccountControllerTest {
 
         Mockito.when(crudService.readAccountList(1, 1)).thenReturn(accountList);
 
-        mvc.perform(get("/users/list?page=1&size=1")
+        mvc.perform(get("/users?page=1&size=1")
                             .accept(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", hasSize(1)))
